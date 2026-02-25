@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -5,6 +7,7 @@ pub struct Output {
     pub chapters: Vec<Chapter>,
     pub blocks: Vec<Block>,
     pub categories: Vec<Category>,
+    pub modifiers: HashMap<String, ModifierGroup>,
 }
 
 #[derive(Debug, Serialize)]
@@ -42,6 +45,8 @@ pub struct Block {
 pub struct Category {
     pub code: String,
     pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_long: Option<String>,
     pub is_terminal: bool,
     pub super_class: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -58,7 +63,7 @@ pub struct Category {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub modifiers: Vec<ModifierGroup>,
+    pub modifiers: Vec<ModifierRef>,
 }
 
 #[derive(Debug, Serialize)]
@@ -68,8 +73,14 @@ pub struct BreadcrumbEntry {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ModifierGroup {
+pub struct ModifierRef {
     pub code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub valid_values: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ModifierGroup {
     pub description: String,
     pub values: Vec<ModifierValue>,
 }

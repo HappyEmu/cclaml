@@ -1,6 +1,6 @@
 # cclaml
 
-ClaML XML to JSON parser for ICD-10-GM classification data.
+ClaML XML to JSON parser for ICD-10-GM and OPS classification data.
 
 ## Build & Run
 
@@ -9,7 +9,9 @@ cargo build --release
 cargo run --release -- <input.xml> -o output.json
 ```
 
-Test file: `/Users/gerberur/Desktop/medcode-claude/icd10gm2025syst-claml/Klassifikationsdateien/icd10gm2025syst_claml_20240913.xml`
+Test files:
+- ICD-10-GM: `/Users/gerberur/Desktop/medcode-claude/icd10gm2025syst-claml/Klassifikationsdateien/icd10gm2025syst_claml_20240913.xml`
+- OPS: `/Users/gerberur/Downloads/ops2026syst-claml 2/Klassifikationsdateien/ops2026syst_claml_20251017.xml`
 
 ## Architecture
 
@@ -22,15 +24,32 @@ Test file: `/Users/gerberur/Desktop/medcode-claude/icd10gm2025syst-claml/Klassif
 ## Key Design Decisions
 
 - **Mixed XML content**: quick-xml serde can't handle interleaved text/elements with `$text`. Uses `$value` + enum (`LabelContent`, `SimpleMixed`) to capture ordered mixed content.
-- **References**: Formatted as `{{code†}}` / `{{code*}}` / `{{code!}}` in label text (dagger/aster/optional usage marks).
+- **References**: Formatted as `{{code†}}` / `{{code*}}` / `{{code!}}` in label text (dagger/aster/optional usage marks). Unknown usage kinds (e.g., OPS "seite") produce no mark suffix.
+- **Block range parsing**: Tries `...` separator first (OPS, e.g., `1-20...1-33`), then falls back to `-` (ICD-10-GM, e.g., `A00-A09`). Needed because OPS codes contain `-`.
 - **Modifier exclusions**: `excludeOnPrecedingModifier` meta on ModifierClass encodes which modifier value combinations are invalid. Exposed as `excludes` array on each modifier value.
 - **Modifier rubrics**: Each ModifierClass can have its own inclusions, exclusions, coding hints, definitions, notes — independent from the parent category.
 - **Breadcrumbs**: Include `kind` (chapter/block/category) alongside `code` for unambiguous resolution.
 
-## ICD-10-GM ClaML Concepts
+## ClaML Concepts
 
-- **Chapters** (I–XXII): Top-level grouping by roman numeral.
-- **Blocks** (e.g., A00-A09): Range-based grouping within chapters.
-- **Categories** (e.g., A00, A00.0): Individual codes. Terminal if no sub_classes.
-- **Modifiers**: Reusable digit-extension templates (4th/5th position). Applied via `ModifiedBy` on categories. `all="false"` + `ValidModifierClass` restricts which values apply.
+Both ICD-10-GM and OPS use the ClaML 2.0.0 schema. Same XML structure, different data conventions.
+
+### Shared Structure
+
+- **Chapters**: Top-level grouping. ICD uses roman numerals (I–XXII), OPS uses digits (1, 3, 5, 6, 8, 9).
+- **Blocks**: Range-based grouping within chapters. ICD: `A00-A09`, OPS: `1-20...1-33`.
+- **Categories**: Individual codes. Terminal if no sub_classes.
+- **Modifiers**: Reusable digit-extension templates. Applied via `ModifiedBy` on categories. `all="false"` + `ValidModifierClass` restricts which values apply.
+
+### ICD-10-GM Specifics
+
+- **Code format**: Letter + digits (e.g., `A00`, `A00.0`).
 - **UsageKinds**: dagger (†) = etiology, aster (*) = manifestation, optional (!) = supplementary.
+- **RubricKinds**: preferred, inclusion, exclusion, note, coding_hint, definition, text.
+
+### OPS Specifics
+
+- **Code format**: Digit + hyphen + digits (e.g., `1-20`, `1-202.01`). Can have letter suffixes (`1-20a`, `6-00p`). Special codes: `x` (sonstige/other), `y` (n.n.bez./not otherwise specified).
+- **Block separator**: `...` instead of `-` (because codes themselves contain `-`).
+- **UsageKinds**: seite (S) = side/location marking.
+- **RubricKinds**: preferred, preferredLong, inclusion, exclusion, note.

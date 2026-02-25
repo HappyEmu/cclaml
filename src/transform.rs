@@ -1,15 +1,19 @@
 use std::collections::HashMap;
 
 use crate::model::{self, ClaML};
-use crate::output::{Block, BreadcrumbEntry, Category, Chapter, ModifierExclusion, ModifierGroup, ModifierValue, Output};
+use crate::output::{
+    Block, BreadcrumbEntry, Category, Chapter, ModifierExclusion, ModifierGroup, ModifierRef,
+    ModifierValue, Output,
+};
 
 pub fn transform(claml: &ClaML) -> Output {
-    // Phase 2: Build lookup maps
     let modifier_map = build_modifier_map(claml);
     let modifier_class_map = build_modifier_class_map(claml);
     let class_map = build_class_map(claml);
 
-    // Phase 3 & 4 & 5: Build output structs
+    // Build top-level modifier definitions once
+    let modifier_definitions = build_modifier_definitions(&modifier_map, &modifier_class_map);
+
     let mut chapters = Vec::new();
     let mut blocks = Vec::new();
     let mut categories = Vec::new();
@@ -24,8 +28,7 @@ pub fn transform(claml: &ClaML) -> Output {
             }
             "category" => {
                 let breadcrumb = build_breadcrumb(&class.code, &class_map);
-                let modifiers =
-                    resolve_modifiers(&class.modified_by, &modifier_map, &modifier_class_map);
+                let modifiers = resolve_modifier_refs(&class.modified_by);
                 categories.push(build_category(class, breadcrumb, modifiers));
             }
             _ => {}
@@ -36,6 +39,7 @@ pub fn transform(claml: &ClaML) -> Output {
         chapters,
         blocks,
         categories,
+        modifiers: modifier_definitions,
     }
 }
 
@@ -53,6 +57,83 @@ fn build_modifier_class_map(claml: &ClaML) -> HashMap<String, Vec<&model::Modifi
 
 fn build_class_map(claml: &ClaML) -> HashMap<String, &model::Class> {
     claml.classes.iter().map(|c| (c.code.clone(), c)).collect()
+}
+
+fn build_modifier_definitions(
+    modifier_map: &HashMap<String, &model::Modifier>,
+    modifier_class_map: &HashMap<String, Vec<&model::ModifierClass>>,
+) -> HashMap<String, ModifierGroup> {
+    let mut definitions = HashMap::new();
+
+    for (code, modifier) in modifier_map {
+        let description = get_text_label(&modifier.rubrics);
+
+        let values = if let Some(mcs) = modifier_class_map.get(code) {
+            mcs.iter()
+                .map(|mc| {
+                    let excludes = mc
+                        .metas
+                        .iter()
+                        .filter(|m| m.name == "excludeOnPrecedingModifier")
+                        .filter_map(|m| {
+                            let (modifier, code) = m.value.split_once(' ')?;
+                            Some(ModifierExclusion {
+                                modifier: modifier.to_string(),
+                                code: code.to_string(),
+                            })
+                        })
+                        .collect();
+                    ModifierValue {
+                        code: mc.code.clone(),
+                        label: get_preferred_label(&mc.rubrics),
+                        usage: mc.usage.clone(),
+                        inclusions: get_rubric_labels(&mc.rubrics, "inclusion"),
+                        exclusions: get_rubric_labels(&mc.rubrics, "exclusion"),
+                        coding_hints: get_rubric_labels(&mc.rubrics, "coding-hint"),
+                        definitions: get_rubric_labels(&mc.rubrics, "definition"),
+                        notes: get_rubric_labels(&mc.rubrics, "note"),
+                        excludes,
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        definitions.insert(
+            code.clone(),
+            ModifierGroup {
+                description,
+                values,
+            },
+        );
+    }
+
+    definitions
+}
+
+/// Build modifier references for a category. Each reference has the modifier code
+/// and optionally a `valid_values` list when `all="false"`.
+fn resolve_modifier_refs(modified_by: &[model::ModifiedBy]) -> Vec<ModifierRef> {
+    modified_by
+        .iter()
+        .map(|mb| {
+            let valid_values = if !mb.all {
+                Some(
+                    mb.valid_modifier_classes
+                        .iter()
+                        .map(|v| v.code.clone())
+                        .collect(),
+                )
+            } else {
+                None
+            };
+            ModifierRef {
+                code: mb.code.clone(),
+                valid_values,
+            }
+        })
+        .collect()
 }
 
 fn get_preferred_label(rubrics: &[model::Rubric]) -> String {
@@ -73,6 +154,17 @@ fn get_rubric_labels(rubrics: &[model::Rubric], kind: &str) -> Vec<String> {
         .flat_map(|r| r.labels.iter().map(|l| l.flat_text()))
         .filter(|s| !s.is_empty())
         .collect()
+}
+
+fn get_preferred_long_label(rubrics: &[model::Rubric]) -> String {
+    for rubric in rubrics {
+        if rubric.kind == "preferredLong" {
+            if let Some(label) = rubric.labels.first() {
+                return label.flat_text();
+            }
+        }
+    }
+    String::new()
 }
 
 fn get_text_label(rubrics: &[model::Rubric]) -> String {
@@ -113,10 +205,13 @@ fn build_block(class: &model::Class) -> Block {
 }
 
 fn parse_block_range(code: &str) -> (String, String) {
-    if let Some((start, end)) = code.split_once('-') {
+    // OPS uses "..." as separator (e.g., "1-20...1-33") since codes contain "-"
+    // ICD-10-GM uses "-" (e.g., "A00-A09")
+    if let Some((start, end)) = code.split_once("...") {
+        (start.to_string(), end.to_string())
+    } else if let Some((start, end)) = code.split_once('-') {
         (start.to_string(), end.to_string())
     } else {
-        // Single-code blocks like "B99-B99" — shouldn't happen but handle gracefully
         (code.to_string(), code.to_string())
     }
 }
@@ -124,11 +219,17 @@ fn parse_block_range(code: &str) -> (String, String) {
 fn build_category(
     class: &model::Class,
     breadcrumb: Vec<BreadcrumbEntry>,
-    modifiers: Vec<ModifierGroup>,
+    modifiers: Vec<ModifierRef>,
 ) -> Category {
+    let label_long = get_preferred_long_label(&class.rubrics);
     Category {
         code: class.code.clone(),
         label: get_preferred_label(&class.rubrics),
+        label_long: if label_long.is_empty() {
+            None
+        } else {
+            Some(label_long)
+        },
         is_terminal: class.sub_classes.is_empty(),
         super_class: class.super_classes.first().map(|s| s.code.clone()),
         sub_classes: class.sub_classes.iter().map(|s| s.code.clone()).collect(),
@@ -175,77 +276,4 @@ fn build_breadcrumb(code: &str, class_map: &HashMap<String, &model::Class>) -> V
 
     crumbs.reverse();
     crumbs
-}
-
-fn resolve_modifiers(
-    modified_by: &[model::ModifiedBy],
-    modifier_map: &HashMap<String, &model::Modifier>,
-    modifier_class_map: &HashMap<String, Vec<&model::ModifierClass>>,
-) -> Vec<ModifierGroup> {
-    let mut groups = Vec::new();
-
-    for mb in modified_by {
-        let description = modifier_map
-            .get(&mb.code)
-            .map(|m| get_text_label(&m.rubrics))
-            .unwrap_or_default();
-
-        let values = if let Some(mcs) = modifier_class_map.get(&mb.code) {
-            let valid_codes: Option<std::collections::HashSet<&str>> = if !mb.all {
-                Some(
-                    mb.valid_modifier_classes
-                        .iter()
-                        .map(|v| v.code.as_str())
-                        .collect(),
-                )
-            } else {
-                None
-            };
-
-            mcs.iter()
-                .filter(|mc| {
-                    if let Some(ref valid) = valid_codes {
-                        valid.contains(mc.code.as_str())
-                    } else {
-                        true
-                    }
-                })
-                .map(|mc| {
-                    let excludes = mc
-                        .metas
-                        .iter()
-                        .filter(|m| m.name == "excludeOnPrecedingModifier")
-                        .filter_map(|m| {
-                            let (modifier, code) = m.value.split_once(' ')?;
-                            Some(ModifierExclusion {
-                                modifier: modifier.to_string(),
-                                code: code.to_string(),
-                            })
-                        })
-                        .collect();
-                    ModifierValue {
-                        code: mc.code.clone(),
-                        label: get_preferred_label(&mc.rubrics),
-                        usage: mc.usage.clone(),
-                        inclusions: get_rubric_labels(&mc.rubrics, "inclusion"),
-                        exclusions: get_rubric_labels(&mc.rubrics, "exclusion"),
-                        coding_hints: get_rubric_labels(&mc.rubrics, "coding-hint"),
-                        definitions: get_rubric_labels(&mc.rubrics, "definition"),
-                        notes: get_rubric_labels(&mc.rubrics, "note"),
-                        excludes,
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
-
-        groups.push(ModifierGroup {
-            code: mb.code.clone(),
-            description,
-            values,
-        });
-    }
-
-    groups
 }
