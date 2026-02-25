@@ -1,0 +1,12 @@
+[package]
+name = "cclaml"
+version = "0.1.0"
+edition = "2021"
+description = "ClaML XML to JSON parser for ICD-10-GM"
+
+[dependencies]
+quick-xml = { version = "0.37", features = ["serialize"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
