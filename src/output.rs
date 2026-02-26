@@ -21,7 +21,13 @@ pub struct Chapter {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub exclusions: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub coding_hints: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub introductions: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub texts: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -39,7 +45,11 @@ pub struct Block {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub exclusions: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub coding_hints: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub texts: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -63,6 +73,8 @@ pub struct Category {
     pub definitions: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub texts: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub modifiers: Vec<ModifierRef>,
 }

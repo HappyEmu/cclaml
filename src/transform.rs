@@ -210,7 +210,10 @@ fn build_chapter(class: &model::Class) -> Chapter {
         sub_classes: class.sub_classes.iter().map(|s| s.code.clone()).collect(),
         inclusions: get_rubric_labels(&class.rubrics, "inclusion"),
         exclusions: get_rubric_labels(&class.rubrics, "exclusion"),
+        coding_hints: get_rubric_labels(&class.rubrics, "coding-hint"),
         notes: get_rubric_labels(&class.rubrics, "note"),
+        introductions: get_rubric_labels(&class.rubrics, "introduction"),
+        texts: get_rubric_labels(&class.rubrics, "text"),
     }
 }
 
@@ -226,7 +229,9 @@ fn build_block(class: &model::Class, breadcrumb: Vec<BreadcrumbEntry>) -> Block 
         breadcrumb,
         inclusions: get_rubric_labels(&class.rubrics, "inclusion"),
         exclusions: get_rubric_labels(&class.rubrics, "exclusion"),
+        coding_hints: get_rubric_labels(&class.rubrics, "coding-hint"),
         notes: get_rubric_labels(&class.rubrics, "note"),
+        texts: get_rubric_labels(&class.rubrics, "text"),
     }
 }
 
@@ -265,6 +270,7 @@ fn build_category(
         coding_hints: get_rubric_labels(&class.rubrics, "coding-hint"),
         definitions: get_rubric_labels(&class.rubrics, "definition"),
         notes: get_rubric_labels(&class.rubrics, "note"),
+        texts: get_rubric_labels(&class.rubrics, "text"),
         modifiers,
     }
 }
@@ -329,6 +335,7 @@ fn expand_modifiers(
     let parent_coding_hints = get_rubric_labels(&class.rubrics, "coding-hint");
     let parent_definitions = get_rubric_labels(&class.rubrics, "definition");
     let parent_notes = get_rubric_labels(&class.rubrics, "note");
+    let parent_texts = get_rubric_labels(&class.rubrics, "text");
 
     let mut results = Vec::new();
 
@@ -363,6 +370,7 @@ fn expand_modifiers(
         let mut coding_hints = parent_coding_hints.clone();
         let mut definitions = parent_definitions.clone();
         let mut notes = parent_notes.clone();
+        let texts = parent_texts.clone();
 
         for val in combo {
             inclusions.extend(val.inclusions.iter().cloned());
@@ -385,6 +393,7 @@ fn expand_modifiers(
             coding_hints,
             definitions,
             notes,
+            texts,
             modifiers: Vec::new(),
         });
     }
