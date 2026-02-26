@@ -1,3 +1,4 @@
+mod cli;
 mod model;
 mod output;
 mod parser;
@@ -7,30 +8,6 @@ use anyhow::Result;
 use clap::Parser;
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
-
-#[derive(Parser)]
-#[command(name = "cclaml", about = "Parse ClaML XML files to structured JSON")]
-struct Cli {
-    /// Input ClaML XML file
-    input: PathBuf,
-
-    /// Output JSON file (defaults to stdout)
-    #[arg(short, long)]
-    output: Option<PathBuf>,
-
-    /// Output compact JSON (no pretty-printing)
-    #[arg(long)]
-    compact: bool,
-
-    /// Prefix for output filenames when writing to a directory (e.g. "icd10gm2025_")
-    #[arg(long)]
-    prefix: Option<String>,
-
-    /// Print written file paths to stdout (useful for piping to gzip, xargs, etc.)
-    #[arg(long)]
-    emit_paths: bool,
-}
 
 fn to_json(data: &impl serde::Serialize, compact: bool) -> serde_json::Result<String> {
     if compact {
@@ -41,7 +18,7 @@ fn to_json(data: &impl serde::Serialize, compact: bool) -> serde_json::Result<St
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let cli = cli::Cli::parse();
 
     eprintln!("Parsing {}...", cli.input.display());
     let claml = parser::parse_claml(&cli.input)?;
