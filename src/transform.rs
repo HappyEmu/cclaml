@@ -254,21 +254,17 @@ fn build_breadcrumb(code: &str, class_map: &HashMap<String, &model::Class>) -> V
     }
 
     let mut current = code;
-    loop {
-        if let Some(class) = class_map.get(current) {
-            if let Some(parent) = class.super_classes.first() {
-                let kind = class_map
-                    .get(parent.code.as_str())
-                    .map(|c| c.kind.clone())
-                    .unwrap_or_default();
-                crumbs.push(BreadcrumbEntry {
-                    code: parent.code.clone(),
-                    kind,
-                });
-                current = &parent.code;
-            } else {
-                break;
-            }
+    while let Some(class) = class_map.get(current) {
+        if let Some(parent) = class.super_classes.first() {
+            let kind = class_map
+                .get(parent.code.as_str())
+                .map(|c| c.kind.clone())
+                .unwrap_or_default();
+            crumbs.push(BreadcrumbEntry {
+                code: parent.code.clone(),
+                kind,
+            });
+            current = &parent.code;
         } else {
             break;
         }
