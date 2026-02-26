@@ -41,8 +41,6 @@ pub fn transform(claml: &ClaML, flat: bool) -> Output {
             "category" => {
                 let breadcrumb = build_breadcrumb(&class.code, &class_map);
                 if flat && !class.modified_by.is_empty() {
-                    // Emit parent category without modifier refs
-                    categories.push(build_category(class, breadcrumb.clone(), Vec::new()));
                     // Emit expanded categories for each resolved modifier combination
                     let expanded = expand_modifiers(
                         class,
@@ -50,6 +48,10 @@ pub fn transform(claml: &ClaML, flat: bool) -> Output {
                         &modifier_definitions,
                         &exclude_modifier_set,
                     );
+                    // Emit parent category without modifier refs, with mod_codes
+                    let mut parent = build_category(class, breadcrumb.clone(), Vec::new());
+                    parent.mod_codes = expanded.iter().map(|c| c.code.clone()).collect();
+                    categories.push(parent);
                     categories.extend(expanded);
                 } else {
                     let modifiers = resolve_modifier_refs(&class.modified_by);
@@ -271,6 +273,7 @@ fn build_category(
         definitions: get_rubric_labels(&class.rubrics, "definition"),
         notes: get_rubric_labels(&class.rubrics, "note"),
         texts: get_rubric_labels(&class.rubrics, "text"),
+        mod_codes: Vec::new(),
         modifiers,
     }
 }
@@ -394,6 +397,7 @@ fn expand_modifiers(
             definitions,
             notes,
             texts,
+            mod_codes: Vec::new(),
             modifiers: Vec::new(),
         });
     }

@@ -76,6 +76,8 @@ pub struct Category {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub texts: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub mod_codes: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub modifiers: Vec<ModifierRef>,
 }
 
