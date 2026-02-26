@@ -13,3 +13,6 @@ Cargo.lock
 .DS_Store
 
 output.json
+
+# Local Claude config
+.claude/

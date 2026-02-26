@@ -6,12 +6,19 @@ ClaML XML to JSON parser for ICD-10-GM and OPS classification data.
 
 ```bash
 cargo build --release
-cargo run --release -- <input.xml> -o output.json
+cargo run --release -- <input.xml> -o output.json       # single file
+cargo run --release -- <input.xml> -o out/               # split into directory
+cargo run --release -- <input.xml> -o out/ --prefix icd10gm2025_ --compact
+cargo run --release -- <input.xml> -o out/ --emit-paths | xargs gzip
 ```
 
-Test files:
-- ICD-10-GM: `/Users/gerberur/Desktop/medcode-claude/icd10gm2025syst-claml/Klassifikationsdateien/icd10gm2025syst_claml_20240913.xml`
-- OPS: `/Users/gerberur/Downloads/ops2026syst-claml 2/Klassifikationsdateien/ops2026syst_claml_20251017.xml`
+### CLI Options
+
+- `-o, --output <PATH>` — File path for single JSON, directory path (trailing `/`) to split into chapters/blocks/categories/modifiers. Omit for stdout.
+- `--compact` — Compact JSON (no pretty-printing).
+- `--prefix <PREFIX>` — Filename prefix in directory mode (e.g. `icd10gm2025_`). Must not contain path separators.
+- `--emit-paths` — Print written file paths to stdout (one per line), for piping to `xargs gzip` etc.
+
 
 ## Architecture
 
@@ -19,7 +26,8 @@ Test files:
 - `src/output.rs` — JSON output structs. Empty vecs are skipped via `skip_serializing_if`.
 - `src/parser.rs` — Reads XML file, strips DOCTYPE, deserializes into model structs.
 - `src/transform.rs` — Builds lookup maps, resolves breadcrumbs (with kind), resolves modifiers (with `excludeOnPrecedingModifier` exclusions and per-value rubrics), produces output structs.
-- `src/main.rs` — CLI entry point (clap). Reads XML, transforms, writes JSON to file or stdout.
+- `src/cli.rs` — CLI argument definitions (clap derive).
+- `src/main.rs` — CLI entry point. Reads XML, transforms, writes JSON to file(s) or stdout.
 
 ## Key Design Decisions
 
