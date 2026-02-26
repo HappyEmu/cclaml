@@ -76,7 +76,7 @@ pub struct Category {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub texts: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub mod_codes: Vec<String>,
+    pub mod_codes: Vec<ModCode>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub modifiers: Vec<ModifierRef>,
 }
@@ -118,6 +118,30 @@ pub struct ModifierValue {
     pub notes: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub excludes: Vec<ModifierExclusion>,
+}
+
+#[derive(Debug)]
+pub struct ModCode {
+    pub code: String,
+    pub digits: Vec<ModDigit>,
+}
+
+impl Serialize for ModCode {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(1 + self.digits.len()))?;
+        map.serialize_entry("code", &self.code)?;
+        for digit in &self.digits {
+            map.serialize_entry(&digit.index.to_string(), &digit.modifier)?;
+        }
+        map.end()
+    }
+}
+
+#[derive(Debug)]
+pub struct ModDigit {
+    pub index: usize,
+    pub modifier: String,
 }
 
 #[derive(Debug, Serialize)]

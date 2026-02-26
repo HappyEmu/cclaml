@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::model::{self, ClaML};
 use crate::output::{
-    Block, BreadcrumbEntry, Category, Chapter, ModifierExclusion, ModifierGroup, ModifierRef,
-    ModifierValue, Output,
+    Block, BreadcrumbEntry, Category, Chapter, ModCode, ModDigit, ModifierExclusion,
+    ModifierGroup, ModifierRef, ModifierValue, Output,
 };
 
 pub fn transform(claml: &ClaML, flat: bool) -> Output {
@@ -42,7 +42,7 @@ pub fn transform(claml: &ClaML, flat: bool) -> Output {
                 let breadcrumb = build_breadcrumb(&class.code, &class_map);
                 if flat && !class.modified_by.is_empty() {
                     // Emit expanded categories for each resolved modifier combination
-                    let expanded = expand_modifiers(
+                    let (expanded, mod_codes) = expand_modifiers(
                         class,
                         &breadcrumb,
                         &modifier_definitions,
@@ -50,7 +50,7 @@ pub fn transform(claml: &ClaML, flat: bool) -> Output {
                     );
                     // Emit parent category without modifier refs, with mod_codes
                     let mut parent = build_category(class, breadcrumb.clone(), Vec::new());
-                    parent.mod_codes = expanded.iter().map(|c| c.code.clone()).collect();
+                    parent.mod_codes = mod_codes;
                     categories.push(parent);
                     categories.extend(expanded);
                 } else {
@@ -280,12 +280,13 @@ fn build_category(
 
 /// Expand a category's modifiers into individual flat categories.
 /// For categories with multiple modifiers, only fully-resolved combinations are emitted.
+/// Returns (expanded_categories, mod_codes for the parent).
 fn expand_modifiers(
     class: &model::Class,
     parent_breadcrumb: &[BreadcrumbEntry],
     modifier_definitions: &HashMap<String, ModifierGroup>,
     exclude_modifier_set: &HashMap<String, HashSet<String>>,
-) -> Vec<Category> {
+) -> (Vec<Category>, Vec<ModCode>) {
     let excluded = exclude_modifier_set.get(&class.code);
 
     // Collect valid modifier values for each ModifiedBy, respecting ExcludeModifier
@@ -319,7 +320,7 @@ fn expand_modifiers(
 
     // If any modifier has no valid values, skip expansion entirely
     if modifier_value_sets.is_empty() || modifier_value_sets.iter().any(|s| s.is_empty()) {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
 
     let modifier_codes: Vec<&str> = class
@@ -340,7 +341,8 @@ fn expand_modifiers(
     let parent_notes = get_rubric_labels(&class.rubrics, "note");
     let parent_texts = get_rubric_labels(&class.rubrics, "text");
 
-    let mut results = Vec::new();
+    let mut categories = Vec::new();
+    let mut mod_codes = Vec::new();
 
     for combo in &combinations {
         // Check excludeOnPrecedingModifier conflicts
@@ -348,10 +350,19 @@ fn expand_modifiers(
             continue;
         }
 
-        // Build expanded code: parent code + all modifier value codes
+        // Build expanded code and track digit-to-modifier mapping.
+        // Index is 1-based, counting only significant characters (digits/letters),
+        // skipping separators ('.' and '-') so it matches the code digit position.
         let mut code = class.code.clone();
-        for val in combo {
+        let mut digits = Vec::new();
+        let mut digit_pos = code.chars().filter(|c| *c != '.' && *c != '-').count();
+        for (i, val) in combo.iter().enumerate() {
+            digits.push(ModDigit {
+                index: digit_pos + 1,
+                modifier: modifier_codes[i].to_string(),
+            });
             code.push_str(&val.code);
+            digit_pos += val.code.chars().filter(|c| *c != '.' && *c != '-').count();
         }
 
         // Label: last modifier value's label (most specific)
@@ -383,7 +394,12 @@ fn expand_modifiers(
             notes.extend(val.notes.iter().cloned());
         }
 
-        results.push(Category {
+        mod_codes.push(ModCode {
+            code: code.clone(),
+            digits,
+        });
+
+        categories.push(Category {
             code,
             label,
             label_long: None,
@@ -402,7 +418,7 @@ fn expand_modifiers(
         });
     }
 
-    results
+    (categories, mod_codes)
 }
 
 /// Build the cartesian product of modifier value sets.
