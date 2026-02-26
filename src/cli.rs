@@ -35,4 +35,8 @@ pub struct Cli {
     /// Print written file paths to stdout, one per line. Useful for piping: --emit-paths | xargs gzip
     #[arg(long)]
     pub emit_paths: bool,
+
+    /// Flat output mode: resolve modifiers into individual category codes. Inherited metadata is merged from parent and modifier values. For categories with multiple modifiers, only fully-resolved codes are emitted
+    #[arg(long)]
+    pub flat: bool,
 }

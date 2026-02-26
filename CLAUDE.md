@@ -18,6 +18,7 @@ cargo run --release -- <input.xml> -o out/ --emit-paths | xargs gzip
 - `--compact` — Compact JSON (no pretty-printing).
 - `--prefix <PREFIX>` — Filename prefix in directory mode (e.g. `icd10gm2025_`). Must not contain path separators.
 - `--emit-paths` — Print written file paths to stdout (one per line), for piping to `xargs gzip` etc.
+- `--flat` — Resolve modifiers into individual category codes. Each modifier combination produces a new terminal category that inherits parent metadata. For categories with multiple modifiers, only fully-resolved codes are emitted (no partial application). The top-level modifier definitions remain in the output.
 
 
 ### Piping to jq

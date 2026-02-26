@@ -31,7 +31,7 @@ fn main() -> Result<()> {
     );
 
     eprintln!("Transforming...");
-    let output = transform::transform(&claml);
+    let output = transform::transform(&claml, cli.flat);
 
     eprintln!(
         "Output: {} chapters, {} blocks, {} categories, {} modifiers",

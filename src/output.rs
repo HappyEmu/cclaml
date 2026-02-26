@@ -66,7 +66,7 @@ pub struct Category {
     pub modifiers: Vec<ModifierRef>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BreadcrumbEntry {
     pub code: String,
     pub kind: String,
