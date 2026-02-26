@@ -215,7 +215,15 @@ fn flatten_simple_mixed(content: &[SimpleMixed]) -> String {
     for item in content {
         match item {
             SimpleMixed::Text(t) => out.push_str(t),
-            SimpleMixed::Reference(r) => out.push_str(&r.flat_text()),
+            SimpleMixed::Reference(r) => {
+                let text = r.flat_text();
+                if !text.is_empty() {
+                    if !out.is_empty() && !out.ends_with(' ') {
+                        out.push(' ');
+                    }
+                    out.push_str(&text);
+                }
+            }
             SimpleMixed::Term(t) => {
                 if let Some(text) = &t.text {
                     out.push_str(text);
