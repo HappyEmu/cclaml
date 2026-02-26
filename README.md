@@ -186,25 +186,20 @@ Modifiers are keyed by their code in a top-level map:
 
 ```json
 {
-  "S_A00": {
-    "description": "Cholera",
+  "S04E10_4": {
+    "description": "Die folgenden vierten Stellen sind bei den Kategorien E10-E14 zu benutzen:",
     "values": [
       {
         "code": ".0",
-        "label": "Cholera durch Vibrio cholerae O:1, Biovar cholerae"
+        "label": "Mit Koma",
+        "inclusions": ["Diabetisches Koma: hyperosmolar", "Diabetisches Koma: mit oder ohne Ketoazidose"],
+        "exclusions": ["Hypoglykämisches Koma (.6)"]
       },
       {
-        "code": ".1",
-        "label": "Cholera durch Vibrio cholerae O139",
+        "code": ".2",
+        "label": "Mit Nierenkomplikationen",
         "usage": "dagger",
-        "inclusions": ["Cholera: El Tor"],
-        "exclusions": ["Cholera, nicht näher bezeichnet (A00.9)"],
-        "excludes": [
-          {
-            "modifier": "S_B95_B98",
-            "code": ".0"
-          }
-        ]
+        "inclusions": ["Diabetische Nephropathie {{N08.3*}}", "Kimmelstiel-Wilson-Syndrom {{N08.3*}}"]
       }
     ]
   }
@@ -214,7 +209,7 @@ Modifiers are keyed by their code in a top-level map:
 Fields:
 - `description` — Label for the modifier group (from the `text` rubric).
 - `values` — Available modifier values, each with:
-  - `code` — Modifier value code (e.g., `.0`, `.1`).
+  - `code` — Modifier value code (e.g., `.0`, `.2`).
   - `label` — Preferred label text.
   - `usage` — Usage kind if present (`dagger`, `aster`, `optional`). Omitted when absent.
   - `inclusions`, `exclusions`, `coding_hints`, `definitions`, `notes` — Per-value rubric texts. Omitted when empty.
@@ -263,7 +258,7 @@ cclaml icd10gm2025.xml | jq '[.categories[] | select(.breadcrumb[] | .code == "A
 ### Get modifier details for a specific modifier code
 
 ```bash
-cclaml icd10gm2025.xml | jq '.modifiers["S_A00"]'
+cclaml icd10gm2025.xml | jq '.modifiers["S02C88_5"]'
 ```
 
 ### Combine with `--compact` for faster processing
