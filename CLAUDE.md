@@ -31,7 +31,7 @@ cclaml icd10gm2025.xml | jq '.blocks'                                           
 cclaml icd10gm2025.xml | jq '[.categories[] | select(.is_terminal)]'              # terminal categories
 cclaml icd10gm2025.xml | jq '.categories[] | select(.code == "A00.1")'            # single category
 cclaml icd10gm2025.xml | jq '.chapters[] | {code, label}'                         # chapter code/label pairs
-cclaml icd10gm2025.xml | jq '.modifiers["S_A00"]'                                 # specific modifier
+cclaml icd10gm2025.xml | jq '.modifiers["S02C88_5"]'                                 # specific modifier
 cclaml icd10gm2025.xml --compact | jq '.chapters'                                 # compact for faster piping
 ```
 
