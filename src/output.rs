@@ -33,6 +33,7 @@ pub struct Block {
     pub super_class: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub sub_classes: Vec<String>,
+    pub breadcrumb: Vec<BreadcrumbEntry>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub inclusions: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]

@@ -35,7 +35,8 @@ pub fn transform(claml: &ClaML, flat: bool) -> Output {
                 chapters.push(build_chapter(class));
             }
             "block" => {
-                blocks.push(build_block(class));
+                let breadcrumb = build_breadcrumb(&class.code, &class_map);
+                blocks.push(build_block(class, breadcrumb));
             }
             "category" => {
                 let breadcrumb = build_breadcrumb(&class.code, &class_map);
@@ -213,7 +214,7 @@ fn build_chapter(class: &model::Class) -> Chapter {
     }
 }
 
-fn build_block(class: &model::Class) -> Block {
+fn build_block(class: &model::Class, breadcrumb: Vec<BreadcrumbEntry>) -> Block {
     let (range_start, range_end) = parse_block_range(&class.code);
     Block {
         code: class.code.clone(),
@@ -222,6 +223,7 @@ fn build_block(class: &model::Class) -> Block {
         range_end,
         super_class: class.super_classes.first().map(|s| s.code.clone()),
         sub_classes: class.sub_classes.iter().map(|s| s.code.clone()).collect(),
+        breadcrumb,
         inclusions: get_rubric_labels(&class.rubrics, "inclusion"),
         exclusions: get_rubric_labels(&class.rubrics, "exclusion"),
         notes: get_rubric_labels(&class.rubrics, "note"),
@@ -348,10 +350,10 @@ fn expand_modifiers(
             .map(|v| v.label.clone())
             .unwrap_or_default();
 
-        // Breadcrumb: parent's breadcrumb (ends with parent) + this expanded code
+        // Breadcrumb: parent's ancestors + parent itself
         let mut breadcrumb = parent_breadcrumb.to_vec();
         breadcrumb.push(BreadcrumbEntry {
-            code: code.clone(),
+            code: class.code.clone(),
             kind: "category".to_string(),
         });
 
@@ -423,13 +425,6 @@ fn has_exclusion_conflict(combo: &[&ModifierValue], modifier_codes: &[&str]) -> 
 
 fn build_breadcrumb(code: &str, class_map: &HashMap<String, &model::Class>) -> Vec<BreadcrumbEntry> {
     let mut crumbs = Vec::new();
-
-    if let Some(class) = class_map.get(code) {
-        crumbs.push(BreadcrumbEntry {
-            code: code.to_string(),
-            kind: class.kind.clone(),
-        });
-    }
 
     let mut current = code;
     while let Some(class) = class_map.get(current) {
