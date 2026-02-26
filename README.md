@@ -31,6 +31,7 @@ cclaml [OPTIONS] <INPUT>
 | `--compact` | Output compact JSON instead of pretty-printed |
 | `--prefix <PREFIX>` | Prefix for output filenames in directory mode (e.g. `icd10gm2025_`) |
 | `--emit-paths` | Print written file paths to stdout, one per line. Useful for piping to `xargs gzip` |
+| `--flat` | Resolve modifiers into individual category codes. Each modifier combination produces a new terminal category that inherits parent metadata. For categories with multiple modifiers, only fully-resolved codes are emitted (no partial application). The top-level modifier definitions remain in the output |
 
 ## Examples
 
@@ -88,6 +89,16 @@ Use `--emit-paths` to print written file paths to stdout, then pipe to `xargs gz
 cclaml icd10gm2025.xml -o out/ --prefix icd10gm2025_ --emit-paths | xargs gzip
 ```
 
+### Flat mode (resolved modifiers)
+
+Use `--flat` to resolve modifiers into individual category codes. Each modifier combination produces a new terminal category:
+
+```bash
+cclaml icd10gm2025.xml --flat -o flat.json
+```
+
+Parent categories gain a `mod_codes` field listing the resolved codes, while each resolved category inherits parent metadata (inclusions, exclusions, breadcrumbs, etc.).
+
 ### Stdout
 
 Omit `-o` to write JSON to stdout:
@@ -105,7 +116,8 @@ cclaml icd10gm2025.xml > icd10gm2025.json
   "code": "I",
   "label": "Bestimmte infektiöse und parasitäre Krankheiten",
   "sub_classes": ["A00-A09", "A15-A19", "A20-A28"],
-  "exclusions": ["Grippe und sonstige akute Infektionen der Atemwege (J00-J22)"]
+  "inclusions": ["Krankheiten, die allgemein als ansteckend oder übertragbar anerkannt sind"],
+  "exclusions": ["Grippe und sonstige akute Infektionen der Atemwege {{J00-J22}}"]
 }
 ```
 
@@ -113,7 +125,7 @@ Fields:
 - `code` — Chapter identifier (roman numeral for ICD-10-GM, digit for OPS).
 - `label` — Preferred label text.
 - `sub_classes` — Block codes belonging to this chapter.
-- `inclusions`, `exclusions`, `notes` — Rubric texts. Omitted when empty.
+- `inclusions`, `exclusions`, `notes`, `coding_hints`, `definitions` — Rubric texts. Omitted when empty.
 
 ### Block
 
@@ -125,15 +137,18 @@ Fields:
   "range_end": "A09",
   "super_class": "I",
   "sub_classes": ["A00", "A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09"],
-  "exclusions": ["Lebensmittelvergiftung durch Bakterien (A05.-)"]
+  "breadcrumb": [
+    { "code": "I", "kind": "chapter" }
+  ]
 }
 ```
 
 Fields:
 - `code` — Block range code. ICD-10-GM uses `-` separator (`A00-A09`), OPS uses `...` (`1-20...1-33`).
 - `range_start`, `range_end` — Parsed start/end codes of the range.
-- `super_class` — Parent chapter code.
+- `super_class` — Parent chapter or parent block code.
 - `sub_classes` — Category or sub-block codes within this block.
+- `breadcrumb` — Ancestor path from chapter to this block's parent, each entry with `code` and `kind` (`chapter` or `block`). Blocks can be nested (e.g., ICD: chapter II → block C00-C97 → block C00-C75 → block C00-C14).
 - `inclusions`, `exclusions`, `notes` — Rubric texts. Omitted when empty.
 
 ### Category
@@ -141,23 +156,15 @@ Fields:
 ```json
 {
   "code": "A00.1",
-  "label": "Cholera durch Vibrio cholerae O139",
+  "label": "Cholera durch Vibrio cholerae O:1, Biovar eltor",
   "is_terminal": true,
   "super_class": "A00",
   "breadcrumb": [
     { "code": "I", "kind": "chapter" },
     { "code": "A00-A09", "kind": "block" },
-    { "code": "A00", "kind": "category" },
-    { "code": "A00.1", "kind": "category" }
+    { "code": "A00", "kind": "category" }
   ],
-  "inclusions": ["Cholera: El Tor"],
-  "coding_hints": ["Soll der Erreger angegeben werden, ist eine zusätzliche Schlüsselnummer (U80-U85) zu benutzen."],
-  "modifiers": [
-    {
-      "code": "S_A00",
-      "valid_values": [".0", ".1"]
-    }
-  ]
+  "inclusions": ["El-Tor-Cholera"]
 }
 ```
 
@@ -168,9 +175,10 @@ Fields:
 - `is_terminal` — `true` if the category has no sub-categories.
 - `super_class` — Parent category or block code.
 - `sub_classes` — Child category codes. Omitted when empty.
-- `breadcrumb` — Full path from chapter to this category, each entry with `code` and `kind` (`chapter`, `block`, or `category`).
+- `breadcrumb` — Ancestor path from chapter to this category's parent, each entry with `code` and `kind` (`chapter`, `block`, or `category`). Does not include the category itself.
 - `inclusions`, `exclusions`, `coding_hints`, `definitions`, `notes` — Rubric texts. Omitted when empty.
 - `modifiers` — Modifier references. Each has a `code` pointing into the top-level modifiers map. `valid_values` lists allowed modifier codes when not all values apply; omitted when all values are valid.
+- `mod_codes` — (flat mode only) List of resolved modifier codes derived from this category. Only present when `--flat` is used and the category has modifiers.
 
 ### Modifier
 

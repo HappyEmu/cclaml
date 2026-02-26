@@ -18,6 +18,7 @@ cargo run --release -- <input.xml> -o out/ --emit-paths | xargs gzip
 - `--compact` — Compact JSON (no pretty-printing).
 - `--prefix <PREFIX>` — Filename prefix in directory mode (e.g. `icd10gm2025_`). Must not contain path separators.
 - `--emit-paths` — Print written file paths to stdout (one per line), for piping to `xargs gzip` etc.
+- `--flat` — Resolve modifiers into individual category codes. Each modifier combination produces a new terminal category that inherits parent metadata. For categories with multiple modifiers, only fully-resolved codes are emitted (no partial application). Parent categories gain a `mod_codes` field listing their resolved codes. The top-level modifier definitions remain in the output.
 
 
 ### Piping to jq
@@ -50,16 +51,22 @@ cclaml icd10gm2025.xml --compact | jq '.chapters'                               
 - **Block range parsing**: Tries `...` separator first (OPS, e.g., `1-20...1-33`), then falls back to `-` (ICD-10-GM, e.g., `A00-A09`). Needed because OPS codes contain `-`.
 - **Modifier exclusions**: `excludeOnPrecedingModifier` meta on ModifierClass encodes which modifier value combinations are invalid. Exposed as `excludes` array on each modifier value.
 - **Modifier rubrics**: Each ModifierClass can have its own inclusions, exclusions, coding hints, definitions, notes — independent from the parent category.
-- **Breadcrumbs**: Include `kind` (chapter/block/category) alongside `code` for unambiguous resolution.
+- **Breadcrumbs**: Present on both blocks and categories. Contain only ancestors (never the item itself), with `kind` (chapter/block/category) alongside `code` for unambiguous resolution. Blocks can be nested (e.g., ICD: chapter II → block C00-C97 → block C00-C75 → block C00-C14).
 
 ## ClaML Concepts
 
 Both ICD-10-GM and OPS use the ClaML 2.0.0 schema. Same XML structure, different data conventions.
 
+## Local Test Files
+Use these to test your implementation and changes.
+
+- ICD-10-GM: `data/icd10gm2025syst_claml_20240913.xml`
+- OPS: `data/ops2026syst_claml_20251017.xml`
+
 ### Shared Structure
 
 - **Chapters**: Top-level grouping. ICD uses roman numerals (I–XXII), OPS uses digits (1, 3, 5, 6, 8, 9).
-- **Blocks**: Range-based grouping within chapters. ICD: `A00-A09`, OPS: `1-20...1-33`.
+- **Blocks**: Range-based grouping within chapters. Can be nested (e.g., ICD: `C00-C97` → `C00-C75` → `C00-C14`). ICD: `A00-A09`, OPS: `1-20...1-33`.
 - **Categories**: Individual codes. Terminal if no sub_classes.
 - **Modifiers**: Reusable digit-extension templates. Applied via `ModifiedBy` on categories. `all="false"` + `ValidModifierClass` restricts which values apply.
 
