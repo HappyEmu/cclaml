@@ -212,6 +212,62 @@ Fields:
   - `inclusions`, `exclusions`, `coding_hints`, `definitions`, `notes` — Per-value rubric texts. Omitted when empty.
   - `excludes` — Modifier value combinations that are invalid when this value is used. Each entry names the other `modifier` code and the excluded `code` within it. Omitted when empty.
 
+## Filtering with jq
+
+When writing to stdout (no `-o`), you can pipe through [jq](https://jqlang.github.io/jq/) to extract subsets of the output.
+
+### Extract a single top-level key
+
+```bash
+# Only chapters
+cclaml icd10gm2025.xml | jq '.chapters'
+
+# Only modifiers
+cclaml icd10gm2025.xml | jq '.modifiers'
+```
+
+### Write a subset to a file
+
+```bash
+cclaml icd10gm2025.xml | jq '.categories' > categories.json
+```
+
+### Find a specific code
+
+```bash
+# Look up a single category by code
+cclaml icd10gm2025.xml | jq '.categories[] | select(.code == "A00.1")'
+
+# Find all blocks in chapter I
+cclaml icd10gm2025.xml | jq '.blocks[] | select(.super_class == "I")'
+```
+
+### List all terminal categories
+
+```bash
+cclaml icd10gm2025.xml | jq '[.categories[] | select(.is_terminal)] | length'
+```
+
+### Extract codes and labels only
+
+```bash
+cclaml icd10gm2025.xml | jq '.categories[] | {code, label}'
+```
+
+### Look up a modifier by key
+
+```bash
+cclaml icd10gm2025.xml | jq '.modifiers["S_A00"]'
+```
+
+### Combine with --compact for faster piping
+
+`--compact` skips pretty-printing on the cclaml side, which is faster for large files when jq will reformat anyway:
+
+```bash
+cclaml icd10gm2025.xml --compact | jq '.chapters[]'
+```
+
 ## Supported classifications
 
 - **ICD-10-GM** — International Classification of Diseases, German Modification
