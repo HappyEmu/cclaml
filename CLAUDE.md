@@ -20,6 +20,20 @@ cargo run --release -- <input.xml> -o out/ --emit-paths | xargs gzip
 - `--emit-paths` — Print written file paths to stdout (one per line), for piping to `xargs gzip` etc.
 
 
+### Piping to jq
+
+When writing to stdout (no `-o`), pipe to `jq` to extract subsets:
+
+```bash
+cclaml icd10gm2025.xml | jq '.chapters'                                           # only chapters
+cclaml icd10gm2025.xml | jq '.blocks'                                             # only blocks
+cclaml icd10gm2025.xml | jq '[.categories[] | select(.is_terminal)]'              # terminal categories
+cclaml icd10gm2025.xml | jq '.categories[] | select(.code == "A00.1")'            # single category
+cclaml icd10gm2025.xml | jq '.chapters[] | {code, label}'                         # chapter code/label pairs
+cclaml icd10gm2025.xml | jq '.modifiers["S_A00"]'                                 # specific modifier
+cclaml icd10gm2025.xml --compact | jq '.chapters'                                 # compact for faster piping
+```
+
 ## Architecture
 
 - `src/model.rs` — XML deserialization structs (serde + quick-xml). Mixed content (Label, Para, Fragment) uses `$value` with enum-based approach (`LabelContent`, `SimpleMixed`).

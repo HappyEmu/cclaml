@@ -212,6 +212,60 @@ Fields:
   - `inclusions`, `exclusions`, `coding_hints`, `definitions`, `notes` — Per-value rubric texts. Omitted when empty.
   - `excludes` — Modifier value combinations that are invalid when this value is used. Each entry names the other `modifier` code and the excluded `code` within it. Omitted when empty.
 
+## Piping to jq
+
+When writing to stdout (no `-o`), you can pipe directly to `jq` to extract or filter parts of the output.
+
+### Extract only chapters
+
+```bash
+cclaml icd10gm2025.xml | jq '.chapters'
+```
+
+### Extract only blocks
+
+```bash
+cclaml icd10gm2025.xml | jq '.blocks'
+```
+
+### Extract only terminal categories
+
+```bash
+cclaml icd10gm2025.xml | jq '[.categories[] | select(.is_terminal)]'
+```
+
+### Look up a single category by code
+
+```bash
+cclaml icd10gm2025.xml | jq '.categories[] | select(.code == "A00.1")'
+```
+
+### List all chapter codes and labels
+
+```bash
+cclaml icd10gm2025.xml | jq '.chapters[] | {code, label}'
+```
+
+### Extract categories belonging to a specific block
+
+```bash
+cclaml icd10gm2025.xml | jq '[.categories[] | select(.breadcrumb[] | .code == "A00-A09" and .kind == "block")]'
+```
+
+### Get modifier details for a specific modifier code
+
+```bash
+cclaml icd10gm2025.xml | jq '.modifiers["S_A00"]'
+```
+
+### Combine with `--compact` for faster processing
+
+For large files, `--compact` skips pretty-printing and produces smaller output, which `jq` can then re-format as needed:
+
+```bash
+cclaml icd10gm2025.xml --compact | jq '.chapters'
+```
+
 ## Supported classifications
 
 - **ICD-10-GM** — International Classification of Diseases, German Modification
