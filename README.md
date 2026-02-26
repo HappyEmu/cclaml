@@ -4,6 +4,14 @@ ClaML XML to JSON parser for ICD-10-GM and OPS classification data.
 
 ## Install
 
+From the repository:
+
+```bash
+cargo install --git https://github.com/HappyEmu/cclaml.git
+```
+
+Or build locally:
+
 ```bash
 cargo build --release
 ```
