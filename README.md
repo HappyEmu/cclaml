@@ -18,6 +18,37 @@ cargo build --release
 
 The binary is at `target/release/cclaml`.
 
+### Cross-compile for Linux (musl)
+
+To produce a statically-linked Linux binary from macOS:
+
+1. Install the musl cross-compiler toolchain:
+
+```bash
+brew install filosottile/musl-cross/musl-cross
+```
+
+2. Add the Rust target:
+
+```bash
+rustup target add x86_64-unknown-linux-musl
+```
+
+3. Configure the linker in `.cargo/config.toml`:
+
+```toml
+[target.x86_64-unknown-linux-musl]
+linker = "x86_64-linux-musl-gcc"
+```
+
+4. Build:
+
+```bash
+cargo build --release --target x86_64-unknown-linux-musl
+```
+
+The statically-linked binary is at `target/x86_64-unknown-linux-musl/release/cclaml`. It runs on any x86_64 Linux system with no runtime dependencies.
+
 ## Usage
 
 ```
