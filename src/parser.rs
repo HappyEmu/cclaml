@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use quick_xml::de::from_str;
+use std::borrow::Cow;
 use std::fs;
 use std::path::Path;
 
@@ -18,15 +19,17 @@ pub fn parse_claml(path: &Path) -> Result<ClaML> {
     Ok(claml)
 }
 
-fn strip_doctype(xml: &str) -> String {
-    // Remove <!DOCTYPE ...> line
-    let mut result = String::with_capacity(xml.len());
-    for line in xml.lines() {
-        if line.trim_start().starts_with("<!DOCTYPE") {
-            continue;
-        }
-        result.push_str(line);
-        result.push('\n');
-    }
-    result
+fn strip_doctype(xml: &str) -> Cow<'_, str> {
+    // Find the DOCTYPE declaration and splice it out without copying the entire file line-by-line
+    let Some(start) = xml.find("<!DOCTYPE") else {
+        return Cow::Borrowed(xml);
+    };
+
+    // Find the end of the DOCTYPE line
+    let end = xml[start..].find('\n').map_or(xml.len(), |pos| start + pos + 1);
+
+    let mut result = String::with_capacity(xml.len() - (end - start));
+    result.push_str(&xml[..start]);
+    result.push_str(&xml[end..]);
+    Cow::Owned(result)
 }

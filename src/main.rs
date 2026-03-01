@@ -6,14 +6,14 @@ mod transform;
 
 use anyhow::Result;
 use clap::Parser;
-use std::fs;
-use std::io::{self, Write};
+use std::fs::{self, File};
+use std::io::{self, BufWriter, Write};
 
-fn to_json(data: &impl serde::Serialize, compact: bool) -> serde_json::Result<String> {
+fn write_json(writer: impl Write, data: &impl serde::Serialize, compact: bool) -> serde_json::Result<()> {
     if compact {
-        serde_json::to_string(data)
+        serde_json::to_writer(writer, data)
     } else {
-        serde_json::to_string_pretty(data)
+        serde_json::to_writer_pretty(writer, data)
     }
 }
 
@@ -55,10 +55,15 @@ fn main() -> Result<()> {
 
             let emit_paths = cli.emit_paths;
 
-            fn write_json(dir: &std::path::Path, prefix: &str, name: &str, data: &impl serde::Serialize, compact: bool, emit_paths: bool) -> Result<()> {
+            fn write_json_file(dir: &std::path::Path, prefix: &str, name: &str, data: &impl serde::Serialize, compact: bool, emit_paths: bool) -> Result<()> {
                 let file_path = dir.join(format!("{prefix}{name}"));
-                let json = to_json(data, compact)?;
-                fs::write(&file_path, &json)?;
+                let file = File::create(&file_path)?;
+                let writer = BufWriter::new(file);
+                if compact {
+                    serde_json::to_writer(writer, data)?;
+                } else {
+                    serde_json::to_writer_pretty(writer, data)?;
+                }
                 eprintln!("Written {}", file_path.display());
                 if emit_paths {
                     println!("{}", file_path.display());
@@ -66,20 +71,23 @@ fn main() -> Result<()> {
                 Ok(())
             }
 
-            write_json(&path, prefix, "chapters.json", &output.chapters, compact, emit_paths)?;
-            write_json(&path, prefix, "blocks.json", &output.blocks, compact, emit_paths)?;
-            write_json(&path, prefix, "categories.json", &output.categories, compact, emit_paths)?;
-            write_json(&path, prefix, "modifiers.json", &output.modifiers, compact, emit_paths)?;
+            write_json_file(&path, prefix, "chapters.json", &output.chapters, compact, emit_paths)?;
+            write_json_file(&path, prefix, "blocks.json", &output.blocks, compact, emit_paths)?;
+            write_json_file(&path, prefix, "categories.json", &output.categories, compact, emit_paths)?;
+            write_json_file(&path, prefix, "modifiers.json", &output.modifiers, compact, emit_paths)?;
         }
         Some(path) => {
-            let json = to_json(&output, compact)?;
-            fs::write(&path, &json)?;
+            let file = File::create(&path)?;
+            let writer = BufWriter::new(file);
+            write_json(writer, &output, compact)?;
             eprintln!("Written to {}", path.display());
         }
         None => {
-            let json = to_json(&output, compact)?;
-            io::stdout().write_all(json.as_bytes())?;
-            io::stdout().write_all(b"\n")?;
+            let stdout = io::stdout().lock();
+            let mut writer = BufWriter::new(stdout);
+            write_json(&mut writer, &output, compact)?;
+            writer.write_all(b"\n")?;
+            writer.flush()?;
         }
     }
 

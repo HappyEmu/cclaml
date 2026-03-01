@@ -15,13 +15,13 @@ pub fn transform(claml: &ClaML, flat: bool) -> Output {
     let modifier_definitions = build_modifier_definitions(&modifier_map, &modifier_class_map);
 
     // Collect excluded modifier codes per category
-    let exclude_modifier_set: HashMap<String, HashSet<String>> = claml
+    let exclude_modifier_set: HashMap<&str, HashSet<&str>> = claml
         .classes
         .iter()
         .filter(|c| !c.exclude_modifiers.is_empty())
         .map(|c| {
-            let set: HashSet<String> = c.exclude_modifiers.iter().map(|e| e.code.clone()).collect();
-            (c.code.clone(), set)
+            let set: HashSet<&str> = c.exclude_modifiers.iter().map(|e| e.code.as_str()).collect();
+            (c.code.as_str(), set)
         })
         .collect();
 
@@ -70,29 +70,29 @@ pub fn transform(claml: &ClaML, flat: bool) -> Output {
     }
 }
 
-fn build_modifier_map(claml: &ClaML) -> HashMap<String, &model::Modifier> {
-    claml.modifiers.iter().map(|m| (m.code.clone(), m)).collect()
+fn build_modifier_map<'a>(claml: &'a ClaML) -> HashMap<&'a str, &'a model::Modifier> {
+    claml.modifiers.iter().map(|m| (m.code.as_str(), m)).collect()
 }
 
-fn build_modifier_class_map(claml: &ClaML) -> HashMap<String, Vec<&model::ModifierClass>> {
-    let mut map: HashMap<String, Vec<&model::ModifierClass>> = HashMap::new();
+fn build_modifier_class_map<'a>(claml: &'a ClaML) -> HashMap<&'a str, Vec<&'a model::ModifierClass>> {
+    let mut map: HashMap<&str, Vec<&model::ModifierClass>> = HashMap::new();
     for mc in &claml.modifier_classes {
-        map.entry(mc.modifier.clone()).or_default().push(mc);
+        map.entry(mc.modifier.as_str()).or_default().push(mc);
     }
     map
 }
 
-fn build_class_map(claml: &ClaML) -> HashMap<String, &model::Class> {
-    claml.classes.iter().map(|c| (c.code.clone(), c)).collect()
+fn build_class_map<'a>(claml: &'a ClaML) -> HashMap<&'a str, &'a model::Class> {
+    claml.classes.iter().map(|c| (c.code.as_str(), c)).collect()
 }
 
 fn build_modifier_definitions(
-    modifier_map: &HashMap<String, &model::Modifier>,
-    modifier_class_map: &HashMap<String, Vec<&model::ModifierClass>>,
+    modifier_map: &HashMap<&str, &model::Modifier>,
+    modifier_class_map: &HashMap<&str, Vec<&model::ModifierClass>>,
 ) -> HashMap<String, ModifierGroup> {
     let mut definitions = HashMap::new();
 
-    for (code, modifier) in modifier_map {
+    for (&code, modifier) in modifier_map {
         let description = get_text_label(&modifier.rubrics);
 
         let values = if let Some(mcs) = modifier_class_map.get(code) {
@@ -110,15 +110,17 @@ fn build_modifier_definitions(
                             })
                         })
                         .collect();
+
+                    let rubrics = extract_all_rubrics(&mc.rubrics);
                     ModifierValue {
                         code: mc.code.clone(),
-                        label: get_preferred_label(&mc.rubrics),
+                        label: rubrics.preferred,
                         usage: mc.usage.clone(),
-                        inclusions: get_rubric_labels(&mc.rubrics, "inclusion"),
-                        exclusions: get_rubric_labels(&mc.rubrics, "exclusion"),
-                        coding_hints: get_rubric_labels(&mc.rubrics, "coding-hint"),
-                        definitions: get_rubric_labels(&mc.rubrics, "definition"),
-                        notes: get_rubric_labels(&mc.rubrics, "note"),
+                        inclusions: rubrics.inclusions,
+                        exclusions: rubrics.exclusions,
+                        coding_hints: rubrics.coding_hints,
+                        definitions: rubrics.definitions,
+                        notes: rubrics.notes,
                         excludes,
                     }
                 })
@@ -128,7 +130,7 @@ fn build_modifier_definitions(
         };
 
         definitions.insert(
-            code.clone(),
+            code.to_string(),
             ModifierGroup {
                 description,
                 values,
@@ -163,35 +165,110 @@ fn resolve_modifier_refs(modified_by: &[model::ModifiedBy]) -> Vec<ModifierRef> 
         .collect()
 }
 
-fn get_preferred_label(rubrics: &[model::Rubric]) -> String {
-    for rubric in rubrics {
-        if rubric.kind == "preferred" {
-            if let Some(label) = rubric.labels.first() {
-                return label.flat_text();
-            }
-        }
-    }
-    String::new()
+/// Extracted rubric data from a single pass over the rubric list.
+struct ExtractedRubrics {
+    preferred: String,
+    preferred_long: String,
+    inclusions: Vec<String>,
+    exclusions: Vec<String>,
+    coding_hints: Vec<String>,
+    definitions: Vec<String>,
+    notes: Vec<String>,
+    introductions: Vec<String>,
+    texts: Vec<String>,
 }
 
-fn get_rubric_labels(rubrics: &[model::Rubric], kind: &str) -> Vec<String> {
-    rubrics
-        .iter()
-        .filter(|r| r.kind == kind)
-        .flat_map(|r| r.labels.iter().map(|l| l.flat_text()))
-        .filter(|s| !s.is_empty())
-        .collect()
-}
+/// Extract all rubric kinds in a single pass over the rubric list.
+fn extract_all_rubrics(rubrics: &[model::Rubric]) -> ExtractedRubrics {
+    let mut result = ExtractedRubrics {
+        preferred: String::new(),
+        preferred_long: String::new(),
+        inclusions: Vec::new(),
+        exclusions: Vec::new(),
+        coding_hints: Vec::new(),
+        definitions: Vec::new(),
+        notes: Vec::new(),
+        introductions: Vec::new(),
+        texts: Vec::new(),
+    };
 
-fn get_preferred_long_label(rubrics: &[model::Rubric]) -> String {
     for rubric in rubrics {
-        if rubric.kind == "preferredLong" {
-            if let Some(label) = rubric.labels.first() {
-                return label.flat_text();
+        match rubric.kind.as_str() {
+            "preferred" => {
+                if result.preferred.is_empty() {
+                    if let Some(label) = rubric.labels.first() {
+                        result.preferred = label.flat_text();
+                    }
+                }
             }
+            "preferredLong" => {
+                if result.preferred_long.is_empty() {
+                    if let Some(label) = rubric.labels.first() {
+                        result.preferred_long = label.flat_text();
+                    }
+                }
+            }
+            "inclusion" => {
+                for l in &rubric.labels {
+                    let text = l.flat_text();
+                    if !text.is_empty() {
+                        result.inclusions.push(text);
+                    }
+                }
+            }
+            "exclusion" => {
+                for l in &rubric.labels {
+                    let text = l.flat_text();
+                    if !text.is_empty() {
+                        result.exclusions.push(text);
+                    }
+                }
+            }
+            "coding-hint" => {
+                for l in &rubric.labels {
+                    let text = l.flat_text();
+                    if !text.is_empty() {
+                        result.coding_hints.push(text);
+                    }
+                }
+            }
+            "definition" => {
+                for l in &rubric.labels {
+                    let text = l.flat_text();
+                    if !text.is_empty() {
+                        result.definitions.push(text);
+                    }
+                }
+            }
+            "note" => {
+                for l in &rubric.labels {
+                    let text = l.flat_text();
+                    if !text.is_empty() {
+                        result.notes.push(text);
+                    }
+                }
+            }
+            "introduction" => {
+                for l in &rubric.labels {
+                    let text = l.flat_text();
+                    if !text.is_empty() {
+                        result.introductions.push(text);
+                    }
+                }
+            }
+            "text" => {
+                for l in &rubric.labels {
+                    let text = l.flat_text();
+                    if !text.is_empty() {
+                        result.texts.push(text);
+                    }
+                }
+            }
+            _ => {}
         }
     }
-    String::new()
+
+    result
 }
 
 fn get_text_label(rubrics: &[model::Rubric]) -> String {
@@ -206,34 +283,36 @@ fn get_text_label(rubrics: &[model::Rubric]) -> String {
 }
 
 fn build_chapter(class: &model::Class) -> Chapter {
+    let rubrics = extract_all_rubrics(&class.rubrics);
     Chapter {
         code: class.code.clone(),
-        label: get_preferred_label(&class.rubrics),
+        label: rubrics.preferred,
         sub_classes: class.sub_classes.iter().map(|s| s.code.clone()).collect(),
-        inclusions: get_rubric_labels(&class.rubrics, "inclusion"),
-        exclusions: get_rubric_labels(&class.rubrics, "exclusion"),
-        coding_hints: get_rubric_labels(&class.rubrics, "coding-hint"),
-        notes: get_rubric_labels(&class.rubrics, "note"),
-        introductions: get_rubric_labels(&class.rubrics, "introduction"),
-        texts: get_rubric_labels(&class.rubrics, "text"),
+        inclusions: rubrics.inclusions,
+        exclusions: rubrics.exclusions,
+        coding_hints: rubrics.coding_hints,
+        notes: rubrics.notes,
+        introductions: rubrics.introductions,
+        texts: rubrics.texts,
     }
 }
 
 fn build_block(class: &model::Class, breadcrumb: Vec<BreadcrumbEntry>) -> Block {
     let (range_start, range_end) = parse_block_range(&class.code);
+    let rubrics = extract_all_rubrics(&class.rubrics);
     Block {
         code: class.code.clone(),
-        label: get_preferred_label(&class.rubrics),
+        label: rubrics.preferred,
         range_start,
         range_end,
         super_class: class.super_classes.first().map(|s| s.code.clone()),
         sub_classes: class.sub_classes.iter().map(|s| s.code.clone()).collect(),
         breadcrumb,
-        inclusions: get_rubric_labels(&class.rubrics, "inclusion"),
-        exclusions: get_rubric_labels(&class.rubrics, "exclusion"),
-        coding_hints: get_rubric_labels(&class.rubrics, "coding-hint"),
-        notes: get_rubric_labels(&class.rubrics, "note"),
-        texts: get_rubric_labels(&class.rubrics, "text"),
+        inclusions: rubrics.inclusions,
+        exclusions: rubrics.exclusions,
+        coding_hints: rubrics.coding_hints,
+        notes: rubrics.notes,
+        texts: rubrics.texts,
     }
 }
 
@@ -254,25 +333,25 @@ fn build_category(
     breadcrumb: Vec<BreadcrumbEntry>,
     modifiers: Vec<ModifierRef>,
 ) -> Category {
-    let label_long = get_preferred_long_label(&class.rubrics);
+    let rubrics = extract_all_rubrics(&class.rubrics);
     Category {
         code: class.code.clone(),
-        label: get_preferred_label(&class.rubrics),
-        label_long: if label_long.is_empty() {
+        label: rubrics.preferred,
+        label_long: if rubrics.preferred_long.is_empty() {
             None
         } else {
-            Some(label_long)
+            Some(rubrics.preferred_long)
         },
         is_terminal: class.sub_classes.is_empty(),
         super_class: class.super_classes.first().map(|s| s.code.clone()),
         sub_classes: class.sub_classes.iter().map(|s| s.code.clone()).collect(),
         breadcrumb,
-        inclusions: get_rubric_labels(&class.rubrics, "inclusion"),
-        exclusions: get_rubric_labels(&class.rubrics, "exclusion"),
-        coding_hints: get_rubric_labels(&class.rubrics, "coding-hint"),
-        definitions: get_rubric_labels(&class.rubrics, "definition"),
-        notes: get_rubric_labels(&class.rubrics, "note"),
-        texts: get_rubric_labels(&class.rubrics, "text"),
+        inclusions: rubrics.inclusions,
+        exclusions: rubrics.exclusions,
+        coding_hints: rubrics.coding_hints,
+        definitions: rubrics.definitions,
+        notes: rubrics.notes,
+        texts: rubrics.texts,
         mod_codes: Vec::new(),
         modifiers,
     }
@@ -284,61 +363,64 @@ fn expand_modifiers(
     class: &model::Class,
     parent_breadcrumb: &[BreadcrumbEntry],
     modifier_definitions: &HashMap<String, ModifierGroup>,
-    exclude_modifier_set: &HashMap<String, HashSet<String>>,
+    exclude_modifier_set: &HashMap<&str, HashSet<&str>>,
 ) -> Vec<Category> {
-    let excluded = exclude_modifier_set.get(&class.code);
+    let excluded = exclude_modifier_set.get(class.code.as_str());
 
-    // Collect valid modifier values for each ModifiedBy, respecting ExcludeModifier
-    let modifier_value_sets: Vec<Vec<&ModifierValue>> = class
-        .modified_by
-        .iter()
-        .filter(|mb| {
-            // Skip modifiers excluded by ExcludeModifier on this category
-            excluded.map_or(true, |set| !set.contains(&mb.code))
-        })
-        .map(|mb| {
-            let group = match modifier_definitions.get(&mb.code) {
-                Some(g) => g,
-                None => return Vec::new(),
-            };
-            group
-                .values
-                .iter()
-                .filter(|v| {
-                    if mb.all {
-                        true
-                    } else {
-                        mb.valid_modifier_classes
-                            .iter()
-                            .any(|vc| vc.code == v.code)
-                    }
-                })
-                .collect()
-        })
-        .collect();
+    // Collect valid modifier values and codes in a single pass over modified_by,
+    // respecting ExcludeModifier
+    let mut modifier_value_sets: Vec<Vec<&ModifierValue>> = Vec::new();
+    let mut modifier_codes: Vec<&str> = Vec::new();
+
+    for mb in &class.modified_by {
+        // Skip modifiers excluded by ExcludeModifier on this category
+        if excluded.map_or(false, |set| set.contains(mb.code.as_str())) {
+            continue;
+        }
+
+        let group = match modifier_definitions.get(&mb.code) {
+            Some(g) => g,
+            None => {
+                modifier_value_sets.push(Vec::new());
+                modifier_codes.push(&mb.code);
+                continue;
+            }
+        };
+
+        let values: Vec<&ModifierValue> = group
+            .values
+            .iter()
+            .filter(|v| {
+                if mb.all {
+                    true
+                } else {
+                    mb.valid_modifier_classes
+                        .iter()
+                        .any(|vc| vc.code == v.code)
+                }
+            })
+            .collect();
+
+        modifier_value_sets.push(values);
+        modifier_codes.push(&mb.code);
+    }
 
     // If any modifier has no valid values, skip expansion entirely
     if modifier_value_sets.is_empty() || modifier_value_sets.iter().any(|s| s.is_empty()) {
         return Vec::new();
     }
 
-    let modifier_codes: Vec<&str> = class
-        .modified_by
-        .iter()
-        .filter(|mb| excluded.map_or(true, |set| !set.contains(&mb.code)))
-        .map(|mb| mb.code.as_str())
-        .collect();
-
     // Build cartesian product — for 2+ modifiers only fully-resolved combos
     let combinations = cartesian_product(&modifier_value_sets);
 
     // Collect parent metadata once
-    let parent_inclusions = get_rubric_labels(&class.rubrics, "inclusion");
-    let parent_exclusions = get_rubric_labels(&class.rubrics, "exclusion");
-    let parent_coding_hints = get_rubric_labels(&class.rubrics, "coding-hint");
-    let parent_definitions = get_rubric_labels(&class.rubrics, "definition");
-    let parent_notes = get_rubric_labels(&class.rubrics, "note");
-    let parent_texts = get_rubric_labels(&class.rubrics, "text");
+    let parent_rubrics = extract_all_rubrics(&class.rubrics);
+
+    // Build parent breadcrumb entry once (shared across all combos)
+    let parent_entry = BreadcrumbEntry {
+        code: class.code.clone(),
+        kind: "category".to_string(),
+    };
 
     let mut results = Vec::new();
 
@@ -354,26 +436,21 @@ fn expand_modifiers(
             code.push_str(&val.code);
         }
 
-        // Label: last modifier value's label (most specific)
-        let label = combo
-            .last()
-            .map(|v| v.label.clone())
-            .unwrap_or_default();
+        // Label: parent label + ": " + each modifier value's label joined by ": "
+        let modifier_labels: Vec<&str> = combo.iter().map(|v| v.label.as_str()).collect();
+        let label = format!("{}: {}", parent_rubrics.preferred, modifier_labels.join(": "));
 
         // Breadcrumb: parent's ancestors + parent itself
         let mut breadcrumb = parent_breadcrumb.to_vec();
-        breadcrumb.push(BreadcrumbEntry {
-            code: class.code.clone(),
-            kind: "category".to_string(),
-        });
+        breadcrumb.push(parent_entry.clone());
 
         // Merge metadata: parent + all modifier values in order
-        let mut inclusions = parent_inclusions.clone();
-        let mut exclusions = parent_exclusions.clone();
-        let mut coding_hints = parent_coding_hints.clone();
-        let mut definitions = parent_definitions.clone();
-        let mut notes = parent_notes.clone();
-        let texts = parent_texts.clone();
+        let mut inclusions = parent_rubrics.inclusions.clone();
+        let mut exclusions = parent_rubrics.exclusions.clone();
+        let mut coding_hints = parent_rubrics.coding_hints.clone();
+        let mut definitions = parent_rubrics.definitions.clone();
+        let mut notes = parent_rubrics.notes.clone();
+        let texts = parent_rubrics.texts.clone();
 
         for val in combo {
             inclusions.extend(val.inclusions.iter().cloned());
@@ -436,7 +513,7 @@ fn has_exclusion_conflict(combo: &[&ModifierValue], modifier_codes: &[&str]) -> 
     false
 }
 
-fn build_breadcrumb(code: &str, class_map: &HashMap<String, &model::Class>) -> Vec<BreadcrumbEntry> {
+fn build_breadcrumb(code: &str, class_map: &HashMap<&str, &model::Class>) -> Vec<BreadcrumbEntry> {
     let mut crumbs = Vec::new();
 
     let mut current = code;
