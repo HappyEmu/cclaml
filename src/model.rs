@@ -299,6 +299,7 @@ impl Reference {
             Some("dagger") => "\u{2020}",
             Some("aster") => "*",
             Some("optional") => "!",
+            Some("seite") => "↔",
             _ => "",
         };
         format!("{{{{{inner}{mark}}}}}")

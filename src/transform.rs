@@ -263,7 +263,9 @@ fn build_category(
         } else {
             Some(label_long)
         },
+        usage: class.usage.clone(),
         is_terminal: class.sub_classes.is_empty(),
+        is_modified: !class.modified_by.is_empty(),
         super_class: class.super_classes.first().map(|s| s.code.clone()),
         sub_classes: class.sub_classes.iter().map(|s| s.code.clone()).collect(),
         breadcrumb,
@@ -387,7 +389,9 @@ fn expand_modifiers(
             code,
             label,
             label_long: None,
+            usage: class.usage.clone(),
             is_terminal: true,
+            is_modified: false,
             super_class: Some(class.code.clone()),
             sub_classes: Vec::new(),
             breadcrumb,

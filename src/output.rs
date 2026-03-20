@@ -2,6 +2,10 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
+fn is_false(v: &bool) -> bool {
+    !v
+}
+
 #[derive(Debug, Serialize)]
 pub struct Output {
     pub chapters: Vec<Chapter>,
@@ -58,7 +62,11 @@ pub struct Category {
     pub label: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label_long: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<String>,
     pub is_terminal: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_modified: bool,
     pub super_class: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub sub_classes: Vec<String>,
