@@ -334,6 +334,9 @@ fn expand_modifiers(
     // Build cartesian product — for 2+ modifiers only fully-resolved combos
     let combinations = cartesian_product(&modifier_value_sets);
 
+    // Parent label for building label_long on expanded categories
+    let parent_label = get_preferred_label(&class.rubrics);
+
     // Collect parent metadata once
     let parent_inclusions = get_rubric_labels(&class.rubrics, "inclusion");
     let parent_exclusions = get_rubric_labels(&class.rubrics, "exclusion");
@@ -362,6 +365,15 @@ fn expand_modifiers(
             .map(|v| v.label.clone())
             .unwrap_or_default();
 
+        // label_long: parent label + all modifier value labels joined with ": "
+        let label_long = {
+            let mut parts = vec![parent_label.clone()];
+            for val in combo {
+                parts.push(val.label.clone());
+            }
+            Some(parts.join(": "))
+        };
+
         // Breadcrumb: parent's ancestors + parent itself
         let mut breadcrumb = parent_breadcrumb.to_vec();
         breadcrumb.push(BreadcrumbEntry {
@@ -388,7 +400,7 @@ fn expand_modifiers(
         results.push(Category {
             code,
             label,
-            label_long: None,
+            label_long,
             usage: class.usage.clone(),
             is_terminal: true,
             is_modified: false,

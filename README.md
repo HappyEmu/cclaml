@@ -128,7 +128,7 @@ Use `--flat` to resolve modifiers into individual category codes. Each modifier 
 cclaml icd10gm2025.xml --flat -o flat.json
 ```
 
-Parent categories gain a `mod_codes` field listing the resolved codes, while each resolved category inherits parent metadata (inclusions, exclusions, breadcrumbs, etc.).
+Parent categories gain a `mod_codes` field listing the resolved codes, while each resolved category inherits parent metadata (inclusions, exclusions, breadcrumbs, etc.). Resolved categories also get a `label_long` built by joining the parent label with each modifier value's label using `: ` (e.g., `"Diabetes mellitus, Typ 1: Mit Koma: Als entgleist bezeichnet"` for E10.01).
 
 ### Stdout
 
@@ -202,7 +202,7 @@ Fields:
 Fields:
 - `code` — Category code. ICD-10-GM: letter + digits (`A00.1`). OPS: digit + hyphen + digits (`1-202.01`).
 - `label` — Preferred label. References to other codes appear as `{{A00.0†}}` (dagger), `{{G63.0*}}` (aster), `{{U80!}}` (optional).
-- `label_long` — Extended label (OPS `preferredLong` rubric). Omitted when absent.
+- `label_long` — Extended label. For OPS categories this comes from the `preferredLong` rubric in the XML. In `--flat` mode, it is constructed by joining the parent category label with each modifier value label using `: ` (e.g., `"Diabetes mellitus, Typ 1: Mit Koma: Als entgleist bezeichnet"`). Omitted when absent.
 - `is_terminal` — `true` if the category has no sub-categories.
 - `super_class` — Parent category or block code.
 - `sub_classes` — Child category codes. Omitted when empty.
